@@ -32,8 +32,9 @@ class Player:
         self.ex = 0
         self.inv = {}
 
-    def attack(self, value, enemy):
+    def attack(self, enemy, value):
         enemy.health_points -= value
+
 
     def get_attack(self, value):
         self.health_points -= value
@@ -70,7 +71,7 @@ class Enemy:
 
     def dodge(self):
         chance = random.random()
-        return chance < 0.2    
+        return chance < 0.2     
 
 
 class Play:
@@ -104,6 +105,7 @@ class Play:
 
             itm = ht.pr("\nВыберите предмет или нажмите 'q' для выхода: ", list(self.player.inv.values()) + ['q'])
             if itm == 'q':
+                ht.clear_i(self.player)
                 break
 
             p = ht.pr(f"Вы уверены, что хотите использовать {itm}? (y) - Да , (n) - Нет", ['y', 'n', 'q'])
@@ -124,47 +126,115 @@ class Play:
             break
 
     def fight(self):
-            ht.clear_i(self.player)
-            enemy = self.random_enemy()
-            print(f"Вы встретили врага: {enemy.name}!\n")
-            while enemy.health_points > 0 and self.player.health_points > 0:
-                print(f"{enemy.name}: HP = {enemy.health_points}\n")
-                action = ht.pr("(a) - Атаковать, (d) - Увернуться, (i) - Открыть инвентарь", ['a', 'd', 'i'])
-                if action == 'a':
-                    ht.clear_i(self.player)
-                    if not enemy.dodge():
-                        self.player.attack(enemy, self.player.attack_points)
-                    else:
-                        print(f"{enemy.name} увернулся от вашей атаки!")
-                elif action == 'd':
-                    ht.clear_i(self.player)
-                    if self.player.dodge():
-                        print("Вы успешно увернулись от атаки врага!")
-                        continue
-                elif action == 'i':
-                    ht.clear_i(self.player)
-                    self.open_inv()
-                    continue
-                if enemy.health_points > 0:
-                    ht.clear_i(self.player)
-                    if not self.player.dodge():
-                        enemy.attack(self.player)
-                    else:
-                        print(f"Вы увернулись от атаки {enemy.name}!")
-                time.sleep(1)
-                ht.clear_i(self.player)
+        ht.clear_i(self.player)
+        enemy = self.random_enemy()
+        print(f"Вы встретили врага: {enemy.name}!\n")
 
-            if self.player.health_points > 0:
-                print(f"Вы победили {enemy.name}! Получено опыта: {enemy.exp_reward}")
-                self.player.ex += enemy.exp_reward
-                if enemy.loot:
-                    self.items_count += 1
-                    self.player.inv[f"item{self.items_count}"] = enemy.loot
-                    print(f"Вы получили предмет: {enemy.loot}!")
-            else:
-                print("Вы проиграли! Игра окончена.")
-                self.running = False
-            input("Нажмите [Enter], чтобы продолжить...")
+        while enemy.health_points > 0 and self.player.health_points > 0:
+            print(f"{enemy.name}: HP = {enemy.health_points} | Атака = {enemy.attack_points} | Защита = {enemy.defense_points}\n")
+            
+            action = ht.pr("(a) - Атаковать, (d) - Увернуться, (i) - Открыть инвентарь", ['a', 'd', 'i'])
+            l = False
+            if action == 'a':
+                ht.clear_i(self.player)
+                if not enemy.dodge():  # Враг может увернуться от атаки
+                    if enemy.defense_points > 0:
+                        enemy.defense_points -= self.player.attack_points  # Уменьшаем защиту врага
+                        if enemy.defense_points < 0:
+                            enemy.health_points = enemy.health_points - self.player.attack_points + self.player.defense_points
+                            enemy.defense_points = 0
+                            ht.clear_i(self.player)
+                            print(f"Вы атаковали {enemy.name}. Защита врага теперь: {enemy.defense_points} HP: {enemy.health_points}.")
+                        else:
+                            enemy.health_points = enemy.health_points - self.player.attack_points
+                            ht.clear_i(self.player)
+                            print(f"Вы атаковали {enemy.name}. Защита врага теперь: {enemy.defense_points} HP: {enemy.health_points}.")
+                    elif self.enemy.defense_points == 0:
+                        enemy.defense_points = 0  
+                        enemy.health_points -= self.player.attack_points 
+                        ht.clear_i(self.player)       
+                        print(f"Вы атаковали {enemy.name}. Защита врага теперь: {enemy.defense_points} HP: {enemy.health_points}.")  
+                    elif enemy.defense_points < 0:
+                        enemy.health_points = enemy.health_points - self.player.attack_points + self.player.defense_points
+                        enemy.defense_points = 0      
+                        ht.clear_i(self.player)       
+                        print(f"Вы атаковали {enemy.name}. Его здоровье: {enemy.health_points}")
+                else:
+                    print(f"{enemy.name} увернулся от вашей атаки!")
+
+            
+            elif action == 'd':
+                ht.clear_i(self.player)
+                if self.player.dodge():  # Игрок может увернуться только если выбрал "d"
+                    print("Вы успешно увернулись от атаки врага!")
+                    l = True
+                    continue  # Пропускаем ход врага, если игрок увернулся
+                else:
+                    print("Вы не увернулись от атаки врага!")
+
+            elif action == 'i':
+                ht.clear_i(self.player)
+                self.open_inv()
+                continue
+
+            print("Теперь ход врага...")
+            input("Нажмите [Enter], чтобы враг совершил свой ход...")
+            ht.clear_i(self.player)
+
+            if enemy.health_points > 0:
+                if l == False: 
+                    if self.player.defense_points > 0:
+                        self.player.defense_points -= enemy.attack_points 
+                        if self.player.defense_points < 0: 
+                            self.player.health_points = self.player.health_points - enemy.attack_points + self.player.defense_points
+                            self.player.defense_points = 0
+                            ht.clear_i(self.player)
+                            print(f"Вас атаковал {enemy.name}. Вы получили {enemy.attack_points} урона!.")
+                        else:
+                            self.player.health_points = self.player.health_points - enemy.attack_points
+                            ht.clear_i(self.player)
+                            print(f"Вас атаковал {enemy.name}. Вы получили {enemy.attack_points} урона!.")
+                    elif self.player.defense_points == 0:
+                        self.player.defense_points = 0  
+                        self.player.health_points -= enemy.attack_points
+                        ht.clear_i(self.player)        
+                        print(f"Вас атаковал {enemy.name}. Вы получили {enemy.attack_points} урона!.")   
+                    elif self.player.defense_points < 0:
+                        self.player.health_points -= enemy.attack_points - self.player.defense_points
+                        self.player.defense_points = 0
+                        ht.clear_i(self.player)
+                        print(f"Вас атаковал {enemy.name}. Вы получили {enemy.attack_points} урона!.")
+
+
+                else:
+                    print(f"{enemy.name} пытался атаковать, но вы увернулись!")
+            l == False
+
+            time.sleep(2.5)
+            ht.clear_i(self.player)
+
+        if self.player.health_points > 0:
+            print(f"Вы победили {enemy.name}! Получено опыта: {enemy.exp_reward}")
+            self.player.ex += enemy.exp_reward
+            if enemy.loot:
+                self.items_count += 1
+                self.player.inv[f"item{self.items_count}"] = enemy.loot
+                print(f"Вы получили предмет: {enemy.loot}!")
+        else:
+            print("Вы проиграли! Игра окончена.")
+            self.running = False
+
+        input("Нажмите [Enter], чтобы продолжить...")
+
+
+
+
+
+
+
+
+
+
             
 
             
